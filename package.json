@@ -1,0 +1,19 @@
+{
+  "name": "gnorcs",
+  "version": "1.0.0",
+  "description": "gnasty gnorcs ready for joe tutorial ",
+  "main": "node.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "gnorc",
+    "joe"
+  ],
+  "author": "joe lernY",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.16.3",
+    "socket.io": "^2.1.1"
+  }
+}
