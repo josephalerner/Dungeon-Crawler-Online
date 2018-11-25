@@ -1,10 +1,4 @@
-var players = [];
-
-function Player(x, y, id) {
-    this.x = x;
-    this.y = y;
-    this.id = id;
-}
+var playerDatas = [];
 
 var express = require('express');
 
@@ -15,9 +9,19 @@ app.use(express.static('public'));
 
 console.log("Ok, the server has booted.");
 
-var dimensions = 22; // width and height of the map
-var maxTunnels = 22; // max number of tunnels possible
-var maxLength = 11; // max length each tunnel can have
+function PlayerData(xPos, yPos, rotation, color, weapon, id) { 
+  this.xPos = xPos;
+  this.yPos = yPos;
+  this.rotation = rotation;
+  this.color = color;
+  this.weapon = weapon;
+  this.id = id;
+}
+
+
+var dimensions = 11; // width and height of the map
+var maxTunnels = 11; // max number of tunnels possible
+var maxLength = 5; // max length each tunnel can have
 var dungeonData = createMap(dimensions, maxTunnels, maxLength);
 
 var biggerDungeonData = createArray(1, dimensions + 2)
@@ -32,64 +36,100 @@ console.log(biggerDungeonData);
 dungeonData = biggerDungeonData;
 
 
-var socket = require('socket.io');
-
-var io = socket(server);
+var socketUniversal = require('socket.io');
+var socketServer = socketUniversal(server);
 
 
 setInterval(heartbeat, 33);
 
+var overlapRadius = 25;
+
+function getOverlappingPlayers(x, y) {
+  var overlappingPlayers = [];
+  for (i = 0; i < playerDatas.length; i++) {
+    var xOverlaps = Math.abs(playerDatas[i].x - x) < overlapRadius;
+    var yOverlaps = Math.abs(playerDatas[i].y - y) < overlapRadius;
+    if (xOverlaps && yOverlaps) {
+      overlappingPlayers.push(playerDatas[i]);
+    }
+  }
+
+  return overlappingPlayers;
+}
 
 function heartbeat() {
-    io.sockets.emit('heartbeat', players);
+  socketServer.sockets.emit('heartbeat', playerDatas);
+  //console.log(playerDatas);
 }
 
 
-io.sockets.on('connection', newConnection);
+socketServer.sockets.on('connection', newConnection);
 
-function newConnection(socket) {
-    console.log("new connection: " + socket.id);
+function newConnection(clientSocket) {
+    clientSocket.on('start', onStartMessageReceived);
+    clientSocket.on('update', onUpdateMessageReceived);
+    clientSocket.on('attack', onAttackMessageReceived);
 
-    
+    var initialData = {
+      id: clientSocket.id,
+      dungeon: dungeonData
+    };
 
-    socket.on('start', startMessage);
-    io.sockets.emit('dungeonDataEmit', dungeonData);
-    console.log("sent a dungeon to " + socket.id);
+    //socketServer.sockets.emit('initialDataEmit', initialData);
+    socketServer.sockets.connected[clientSocket.id].emit('initialDataEmit', initialData);
+    console.log("Sent initial data to client: " + clientSocket.id)
 
-    // for some reason this function has to be defined within the scope of newConnection
-    function startMessage(data) {
-        //socket.broadcast.emit('mouse', data);
-        console.log(data);
-        var player = new Player(data.x, data.y, socket.id);
-        players.push(player);
+    function onStartMessageReceived(playerData) {
+        var player = new PlayerData(playerData.x, playerData.y, playerData.rotation, playerData.color, playerData.weapon, playerData.id);
+        playerDatas.push(player);
     }
 
-    socket.on('update', updateMessage);
+    function onUpdateMessageReceived(playerData) {
+        var storedPlayerData;
 
-    function updateMessage(data) {
-        //socket.broadcast.emit('mouse', data);
-        var player;
+        for (var i = 0; i < playerDatas.length; i++) {
+            if (playerData.id == playerDatas[i].id) {
+              storedPlayerData = playerDatas[i];
 
-        for (var i = 0; i < players.length; i++) {
-            if (socket.id == players[i].id) {
-                player = players[i];
-
-                console.log(player.x);
-                console.log("DATA: " + data);
-
-                if (data.x != null) {
-                    console.log("here");
-                    player.x = data.x;
-                    player.y = data.y;
+                if (playerData.x != null) {
+                  storedPlayerData.x = playerData.x;
+                  storedPlayerData.y = playerData.y;
+                  storedPlayerData.rotation = playerData.rotation;
                 }
             }
         }
-
-        
-
-
     }
 
+    function onAttackMessageReceived(playerData) {
+      var daggerAttackRange = 30;
+      //dagger is slightly under the rotation
+      var attackX = playerData.x + (Math.cos(playerData.rotation + 0.3) * daggerAttackRange);
+      var attackY = playerData.y + (Math.sin(playerData.rotation + 0.3) * daggerAttackRange);
+
+      var hitPlayers = getOverlappingPlayers(attackX, attackY);
+      console.log("X: " + attackX + ", Y: " + attackY)
+      console.log(getOverlappingPlayers(attackX, attackY));
+      var hitPlayerId;
+
+      // no friendly fire
+      hitPlayers.filter(player => player.id != playerData.id);
+
+      if (hitPlayers.length > 0) {
+        hitPlayerId = hitPlayers[0].id;
+      }
+
+      var attackData = {
+        attackingId: playerData.id,
+        hitId: hitPlayerId,
+        xDebug: attackX,
+        yDebug: attackY
+      };
+
+      console.log("Hit: " + hitPlayerId);
+
+      socketServer.sockets.emit('attack', attackData);
+
+    } 
 }
 
 
