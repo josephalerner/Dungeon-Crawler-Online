@@ -13,6 +13,7 @@ var playerBodyGroup;
 var playerEquipmentGroup;
 
 var dungeonData = []
+var dungeonDimensions = 0;
 
 var game = new Phaser.Game(window.innerWidth * window.devicePixelRatio, window.innerHeight * window.devicePixelRatio, Phaser.CANVAS, 'phaser-example', { preload: preload, create: create, update: update, render: render });
 var hasReceivedInitialData = false;
@@ -21,36 +22,44 @@ var animateWeapon;
 var animateHit;
 var daggerSwish;
 var daggerHit;
+var deathScream;
 var music;
+var isDead = false;
+
+var dungeonScaleModifier = 1.35;
 
 function preload() {
     game.load.audio('hit', 'assets/hit.wav');
     game.load.audio('swish', 'assets/swish.wav');
-    game.load.audio('music', 'assets/music.mp3');
+    game.load.audio('death', 'assets/boom.wav');
+    game.load.audio('music', 'assets/music.wav');
     game.load.image('bolt', 'assets/bolt.png');
     game.load.image('player', 'assets/player.png');
     game.load.image('dagger', 'assets/dagger.png');
     game.load.image('crossbow', 'assets/crossbow.png');
     game.load.image('wall', 'assets/wall.png');
-    game.load.image('x', 'assets/x.png');
+    game.load.image('x', 'assets/blood.png');
 }
 
 function create() {
+    game.stage.backgroundColor = 0x333333;
     //TODO: loop
     daggerSwish = game.add.audio('swish');
     daggerHit = game.add.audio('hit');
-    music = game.add.audio('music');
+    deathScream = game.add.audio('death');
+    daggerSwish.volume = .5;
+
+    music = game.add.audio('music', .5, true);
 
     music.play();
     music.mute = false;
-    music.volume = 1;
 
     socket = io.connect('localhost:3000');
     // Get ready to handle the dungeon data
     socket.on('initialDataEmit', onInitialDataReceived);
 
     // Immediately create our local player
-    var newPlayerData = new PlayerData(0, 0, 0, getRandomColor(), 'dagger', socket.id);
+    var newPlayerData = new PlayerData(0, 0, 0, getRandomDarkColor(), 'dagger', 5, socket.id);
     localPlayerController = new PlayerController(newPlayerData, true);
     allPlayerControllers.push(localPlayerController);
 
@@ -62,6 +71,7 @@ function create() {
     // Define weapon animation. TODO: this should really be:
     // a) framerate independent
     // b) a method of PlayerController
+    // c) working for other players besides local controller
     animateWeapon = async function asyncCall(playerController) {
         playerController.isAttacking = true;
         for (i = 0; i < 6; i++) { 
@@ -90,7 +100,7 @@ function create() {
 
 }
 
-function getRandomColor() {
+function getRandomDarkColor() {
     var letters = '0123456789ABCDEF';
     var color = '';
     for (var i = 0; i < 6; i++) {
@@ -103,7 +113,9 @@ function getRandomColor() {
         for(var i=0;i<str.length;i++) {
             hex += ''+str.charCodeAt(i).toString(16);
         }
-        return hex;
+
+        // DARKEN
+        return hex/2;
     }
      
 }  
@@ -112,9 +124,9 @@ function bulletCollisionHandler(bullet, object) {
     bullet.kill();
 }
 
-
 function onInitialDataReceived(data) {
     dungeonData = data.dungeon;
+    dungeonDimensions = data.dungeon.length;
     localPlayerController.playerData.id = data.id;
     hasReceivedInitialData = true;
     placeDungeon();
@@ -126,14 +138,11 @@ function onInitialDataReceived(data) {
 
 function onAttackDataReceived(data) {
     var attackingPc = getPlayerControllerById(data.attackingId);
-    var debugSprite = game.add.sprite(data.xDebug, data.yDebug, 'x');
 
-    debugSprite.anchor.x = .5;
-    debugSprite.anchor.y = .5;
-    debugSprite.scale.set(0.1);
-
+    
     if(!isLocalPlayerController(attackingPc)) {
         // TODO: check for off screen
+        animateWeapon(attackingPc);
         daggerSwish.play();
         daggerSwish.mute = false;
         daggerSwish.volume = 1;
@@ -142,6 +151,12 @@ function onAttackDataReceived(data) {
     if (data.hitId === undefined) {
         return;
     }
+
+    var debugSprite = game.add.sprite(data.xDebug, data.yDebug, 'x');
+
+    debugSprite.anchor.x = .5;
+    debugSprite.anchor.y = .5;
+    debugSprite.scale.set(1);
 
     var hitPlayer = getPlayerControllerById(data.hitId);
 
@@ -156,7 +171,25 @@ function onAttackDataReceived(data) {
 
     animateHit(hitPlayer);
     if (isLocalPlayerController(hitPlayer)) {
-        console.log("You got hit.");
+        localPlayerController.playerData.health -= 1;
+        document.getElementById("Health").innerHTML = localPlayerController.playerData.health;
+    }
+}
+
+function onDeathDataReceived(data) {
+    var deadPlayer = getPlayerControllerById(data.deadPlayerId);
+
+    allPlayerControllers.filter(pc => pc.playerData.id != data.deadPlayerId);
+    deadPlayer.playerEquipmentGroup.destroy();
+    deadPlayer.playerSprite.destroy();
+    deadPlayer.playerBodyGroup.destroy();
+    deadPlayer.playerSprite.tint = 0x000000;
+
+    // TODO: check for off screen
+    deathScream.play();
+
+    if(isLocalPlayerController(getPlayerControllerById(data.deadPlayerId))) {
+        isDead = true;
     }
 }
 
@@ -179,7 +212,12 @@ function configureInput() {
    fireButton = game.input.keyboard.addKey(Phaser.KeyCode.SPACEBAR);
 }
 function configureCamera() {
-    game.world.setBounds(-1 * 128, -1 * 128, 23 * 128, 26 * 128);
+    // originally was:
+    // game.world.setBounds(-1 * 128, -1 * 128, (dungeonDimensions) * 128, (dungeonDimensions) * 128);
+    // but we don't want players seeing past the edge walls
+
+    game.world.setBounds(1 * 128 * dungeonScaleModifier, 1 * 128 * dungeonScaleModifier, 
+        (dungeonDimensions - 2) * 128 * dungeonScaleModifier, (dungeonDimensions - 2) * 128 * dungeonScaleModifier);
 
     game.camera.follow(localPlayerController.playerSprite);
 }
@@ -188,16 +226,16 @@ function placeDungeon() {
     for (var i = 0; i < dungeonData.length; i++) {
         for (var j = 0; j < dungeonData.length; j++) {
           if (dungeonData[i][j] == 0) {
-            var s = game.add.sprite(i * 128, j * 128, 'wall');
-            var scaleNeeded = 128/(s.width);
-            s.scale.set(scaleNeeded);
-            s.anchor.x = 0.5;
-            s.anchor.y = 0.5;
+            //var s = game.add.sprite(i * 128, j * 128, 'wall');
+            //var scaleNeeded = 128/(s.width);
+            //s.scale.set(scaleNeeded);
+            //s.anchor.x = 0.5;
+            //s.anchor.y = 0.5;
 
           }
           if (dungeonData[i][j] == 1) {
-            var s = game.add.sprite(i * 128, j * 128, 'wall');
-            var scaleNeeded = 128/(s.width);
+            var s = game.add.sprite(i * 128 * dungeonScaleModifier, j * 128 * dungeonScaleModifier, 'wall');
+            var scaleNeeded = (128* dungeonScaleModifier)/(s.width);
             s.scale.set(scaleNeeded);
             s.tint = 0x222222;
             environmentGroup.add(s);
@@ -228,8 +266,8 @@ function spawnPlayer() {
     }
 
     console.log("X: " + iSpawnPos + ", Y: " + jSpawnPos);
-    localPlayerController.playerData.x = iSpawnPos * 128;
-    localPlayerController.playerData.y = jSpawnPos * 128;
+    localPlayerController.playerData.x = iSpawnPos * 128 * dungeonScaleModifier;
+    localPlayerController.playerData.y = jSpawnPos * 128 * dungeonScaleModifier;
 }
 
 function replyToInitialData() {
@@ -238,6 +276,7 @@ function replyToInitialData() {
     // Handle updates from the server
     socket.on('heartbeat', onHeartbeat);
     socket.on('attack', onAttackDataReceived);
+    socket.on('death', onDeathDataReceived);
 
 }
 
@@ -256,10 +295,11 @@ function onHeartbeat(data) {
             continue;
         }
 
+
         // === vs ==
         if (pc === undefined) {
             var newPlayerData = new PlayerData(serverPlayerDatas[i].x, serverPlayerDatas[i].y, serverPlayerDatas[i].rotation, 
-                serverPlayerDatas[i].color, serverPlayerDatas[i].weapon, serverPlayerDatas[i].id);
+                serverPlayerDatas[i].color, serverPlayerDatas[i].weapon, serverPlayerDatas[i].health, serverPlayerDatas[i].id);
             var newPlayerController = new PlayerController(newPlayerData, false);
             allPlayerControllers.push(newPlayerController);
         } else {
@@ -272,9 +312,16 @@ function updatePlayerControllerPlayerData(pc, data) {
     pc.playerData.x = data.x;
     pc.playerData.y = data.y;
     pc.playerData.rotation = data.rotation;
+    game.world.bringToTop(pc.playerEquipmentGroup);
+
 }
 
 function update() {
+    if (isDead) {
+        alert("YOU HAVE BEEN SLAIN!");
+        document.body.style.backgroundColor = "red";
+    }
+
     if (!hasReceivedInitialData) {
         return;
     }
@@ -291,6 +338,7 @@ function update() {
     allPlayerControllers.forEach(function(pc) {
         pc.update();
     });
+
 }
 
 function render() {

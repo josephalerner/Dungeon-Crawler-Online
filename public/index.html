@@ -1,6 +1,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
+  <link rel="stylesheet" href="stylesheet.css">
   <script language="javascript" type="text/javascript" src="phaser2.js"></script>
   <script language="javascript" type="text/javascript" src="game.js"></script>
   <script language="javascript" type="text/javascript" src="playerData.js"></script>
@@ -9,7 +10,38 @@
 
 
 </head>
+<body id = "Body" bgcolor="#000000">
+    <div class="Row" style="color: white">
+        <div class="Column"><h1 style="color: grey">Your Secret Role: <em  id="Role" style="color:crimson">SURVIVOR.</em></h1></div>
+        <div class="Column"><h1 style="color: grey">Objective: <em id="Objective" style="color: crimson">DON'T DIE.</em></h1></div>
+        <div class="Column"><h1 style="color: grey">Time Remaining: <em id="Timer" style="color:crimson">3:00</em></h1></div>
+        <div class="Column"><h1 style="color: grey">Health Remaining: <em id="Health" style="color:crimson">2</em></h1></div>
+    </div>
 
-<body>
+    <script>
+        // Set the date we're counting down to
+        var countDownDate = new Date().getTime() + 60 * 1000 * 3;
+        
+        // Update the count down every 1 second
+        var x = setInterval(function() {
+        
+          // Get todays date and time
+          var now = new Date().getTime();
+        
+          // Find the distance between now and the count down date
+          var distance = countDownDate - now;
+
+          var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+          var seconds = Math.floor((distance % (1000 * 60)) / 1000);
+        
+          // Display the result in the element with id="demo"
+          document.getElementById("Timer").innerHTML = minutes + "m " + seconds + "s ";
+        
+          // If the count down is finished, write some text 
+          if (distance < 0) {
+            document.body.style.backgroundColor = "green";
+          }
+        }, 1000);
+        </script>
 </body>
 </html>

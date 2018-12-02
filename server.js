@@ -9,25 +9,26 @@ app.use(express.static('public'));
 
 console.log("Ok, the server has booted.");
 
-function PlayerData(xPos, yPos, rotation, color, weapon, id) { 
+function PlayerData(xPos, yPos, rotation, color, weapon, health, id) { 
   this.xPos = xPos;
   this.yPos = yPos;
   this.rotation = rotation;
   this.color = color;
   this.weapon = weapon;
+  this.health = health;
   this.id = id;
 }
 
-
-var dimensions = 11; // width and height of the map
-var maxTunnels = 11; // max number of tunnels possible
-var maxLength = 5; // max length each tunnel can have
+// should be 35 but rn it's 
+var dimensions = 10; // width and height of the map
+var maxTunnels = 100; // max number of tunnels possible
+var maxLength = 22; // max length each tunnel can have
 var dungeonData = createMap(dimensions, maxTunnels, maxLength);
 
-var biggerDungeonData = createArray(1, dimensions + 2)
+var biggerDungeonData = createArray(1, dimensions + 4)
 
-for (let i = 1; i < dimensions; i++) {
-  for (let j = 1; j < dimensions; j++) {
+for (let i = 2; i < dimensions; i++) {
+  for (let j = 2; j < dimensions; j++) {
     biggerDungeonData[i][j] = dungeonData[i][j]
   }
 }
@@ -42,13 +43,14 @@ var socketServer = socketUniversal(server);
 
 setInterval(heartbeat, 33);
 
-var overlapRadius = 25;
+var overlapRadius = 33;
+var dungeonScaleModifier = 1.35;
 
 function getOverlappingPlayers(x, y) {
   var overlappingPlayers = [];
   for (i = 0; i < playerDatas.length; i++) {
-    var xOverlaps = Math.abs(playerDatas[i].x - x) < overlapRadius;
-    var yOverlaps = Math.abs(playerDatas[i].y - y) < overlapRadius;
+    var xOverlaps = Math.abs(playerDatas[i].x - x) < overlapRadius * dungeonScaleModifier;
+    var yOverlaps = Math.abs(playerDatas[i].y - y) < overlapRadius * dungeonScaleModifier;
     if (xOverlaps && yOverlaps) {
       overlappingPlayers.push(playerDatas[i]);
     }
@@ -59,7 +61,6 @@ function getOverlappingPlayers(x, y) {
 
 function heartbeat() {
   socketServer.sockets.emit('heartbeat', playerDatas);
-  //console.log(playerDatas);
 }
 
 
@@ -80,7 +81,7 @@ function newConnection(clientSocket) {
     console.log("Sent initial data to client: " + clientSocket.id)
 
     function onStartMessageReceived(playerData) {
-        var player = new PlayerData(playerData.x, playerData.y, playerData.rotation, playerData.color, playerData.weapon, playerData.id);
+        var player = new PlayerData(playerData.x, playerData.y, playerData.rotation, playerData.color, playerData.weapon, playerData.health, playerData.id);
         playerDatas.push(player);
     }
 
@@ -95,27 +96,44 @@ function newConnection(clientSocket) {
                   storedPlayerData.x = playerData.x;
                   storedPlayerData.y = playerData.y;
                   storedPlayerData.rotation = playerData.rotation;
+                  storedPlayerData.health = playerData.health;
+                  storedPlayerData.weapon = playerData.weapon;
                 }
             }
         }
     }
 
     function onAttackMessageReceived(playerData) {
-      var daggerAttackRange = 30;
+      var daggerAttackRange = 58 * dungeonScaleModifier;
       //dagger is slightly under the rotation
       var attackX = playerData.x + (Math.cos(playerData.rotation + 0.3) * daggerAttackRange);
       var attackY = playerData.y + (Math.sin(playerData.rotation + 0.3) * daggerAttackRange);
 
       var hitPlayers = getOverlappingPlayers(attackX, attackY);
-      console.log("X: " + attackX + ", Y: " + attackY)
-      console.log(getOverlappingPlayers(attackX, attackY));
       var hitPlayerId;
 
       // no friendly fire
       hitPlayers.filter(player => player.id != playerData.id);
 
       if (hitPlayers.length > 0) {
-        hitPlayerId = hitPlayers[0].id;
+        var hitPlayer = hitPlayers[0];
+        hitPlayerId = hitPlayer.id;
+
+        
+
+        console.log(hitPlayer.health);
+        // a little hacky, usually health is updated from client but since in testing client wont update
+        // unless it is open, it's handy to do this. plus that's good in case the client quits.
+        hitPlayer.health -= 1;
+        if (hitPlayer.health <= 0) {
+          var deathData = {
+            deadPlayerId: hitPlayerId,
+          };
+          socketServer.sockets.emit('death', deathData);
+          playerDatas = playerDatas.filter(player => player.health > 0);
+          console.log(playerDatas.length);
+
+        }
       }
 
       var attackData = {
@@ -125,7 +143,6 @@ function newConnection(clientSocket) {
         yDebug: attackY
       };
 
-      console.log("Hit: " + hitPlayerId);
 
       socketServer.sockets.emit('attack', attackData);
 

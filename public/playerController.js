@@ -4,6 +4,11 @@ function PlayerController(playerData, isOwnedPlayer) {
     this.playerBodyGroup = game.add.group();
     this.playerEquipmentGroup = game.add.group();
     this.playerSprite = this.playerBodyGroup.create(0, 0, 'player');
+    this.playerSprite.width = 80;
+    this.playerSprite.height = 80;
+
+    this.playerSprite.smoothed = true;
+    this.playerSprite.antialiasing = true;
     this.isOwnedPlayer = isOwnedPlayer;
 
     // Attach weapon
@@ -12,8 +17,16 @@ function PlayerController(playerData, isOwnedPlayer) {
     this.isAttacking = false;
 
     // Skin player body
-    this.playerSprite.scale.set(1);
     this.playerSprite.tint = this.playerData.color;
+
+    document.getElementById("Health").innerHTML = this.playerData.health;
+
+    this.playerEquipmentGroup.forEach(function(item) {
+        //item.width = 100;a
+        //item.height = 100;
+        item.scale.set(.12);
+
+    });
 
     game.physics.arcade.enable(this.playerBodyGroup);
 
@@ -22,7 +35,7 @@ function PlayerController(playerData, isOwnedPlayer) {
         this.playerSprite.anchor.x = 0.5;
         this.playerSprite.anchor.y = 0.5;
         this.playerEquipmentGroup.forEach(function(item) {
-            item.anchor.x = 0.1;
+            item.anchor.x = .1;
             item.anchor.y = 0.1;
         });
         
@@ -32,6 +45,7 @@ function PlayerController(playerData, isOwnedPlayer) {
 
         // Control player, if client owns it
         if (isOwnedPlayer) {
+
             
             // rotate to cursor
             this.playerData.rotation = game.physics.arcade.angleToPointer(this.playerBodyGroup);
@@ -39,7 +53,7 @@ function PlayerController(playerData, isOwnedPlayer) {
             // handle movement, input, collisions really messy 
             game.physics.arcade.collide(this.playerSprite, environmentGroup, collisionHandler, null, this);
     
-            var speed = 5;
+            var speed = 8;
 
 
             var cursors = game.input.keyboard.createCursorKeys();
@@ -77,8 +91,6 @@ function PlayerController(playerData, isOwnedPlayer) {
             {
                 animateWeapon(this);
                 daggerSwish.play();
-                daggerSwish.mute = false;
-                daggerSwish.volume = 1;
                 socket.emit('attack', localPlayerController.playerData);
             }
 
