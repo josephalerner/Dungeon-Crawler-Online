@@ -13,20 +13,24 @@ function PlayerController(playerData, isOwnedPlayer) {
 
     // Attach weapon
     this.playerBodyGroup.add(this.playerEquipmentGroup);  
-    this.playerEquipmentGroup.create(0, 0, this.playerData.weapon);
-    this.isAttacking = false;
+    var weapon = this.playerEquipmentGroup.create(0, 0, this.playerData.weapon);
+    this.lastAttackTime = new Date().getTime();
+    this.attackSpeed = 1000 * .7; // .7 seconds
 
     // Skin player body
     this.playerSprite.tint = this.playerData.color;
 
     document.getElementById("Health").innerHTML = this.playerData.health;
 
-    this.playerEquipmentGroup.forEach(function(item) {
-        //item.width = 100;a
-        //item.height = 100;
-        item.scale.set(.12);
 
-    });
+    weapon.scale.set(.15);
+
+    /*
+    var shield = this.playerEquipmentGroup.create(0, 0, 'shield');
+    shield.x = -15;
+    shield.y = -50;
+    shield.rotation = -.5;
+    shield.scale.set(.22);*/
 
     game.physics.arcade.enable(this.playerBodyGroup);
 
@@ -42,6 +46,7 @@ function PlayerController(playerData, isOwnedPlayer) {
         // Update visuals: layering
         game.world.bringToTop(this.playerBodyGroup);
         game.world.bringToTop(this.playerEquipmentGroup);
+        game.world.bringToTop(weapon);
 
         // Control player, if client owns it
         if (isOwnedPlayer) {
@@ -87,11 +92,12 @@ function PlayerController(playerData, isOwnedPlayer) {
                 this.playerData.y += speed;
             }
             
-            if (game.input.activePointer.leftButton.isDown && !this.isAttacking)
+            if (game.input.activePointer.leftButton.isDown && (new Date().getTime()) > this.lastAttackTime + this.attackSpeed)
             {
                 animateWeapon(this);
                 daggerSwish.play();
                 socket.emit('attack', localPlayerController.playerData);
+                this.lastAttackTime = new Date().getTime();
             }
 
             canMoveLeft = true;
@@ -99,13 +105,15 @@ function PlayerController(playerData, isOwnedPlayer) {
             canMoveUp = true;
             canMoveDown = true;
 
+            // Update visuals: position and rotation
+            this.playerBodyGroup.x = this.playerData.x;
+            this.playerBodyGroup.y = this.playerData.y;
+            this.playerBodyGroup.rotation = this.playerData.rotation;
+        } else {
+            this.playerBodyGroup.x = lerp(this.playerBodyGroup.x, this.playerData.x, 0.1);
+            this.playerBodyGroup.y = lerp(this.playerBodyGroup.y, this.playerData.y, 0.1);
+            this.playerBodyGroup.rotation = lerp(this.playerBodyGroup.rotation, this.playerData.rotation, 0.1);
         }
-
-        // Update visuals: position and rotation
-        this.playerBodyGroup.x = this.playerData.x;
-        this.playerBodyGroup.y = this.playerData.y;
-        this.playerBodyGroup.rotation = this.playerData.rotation;
-
     }
 }
 

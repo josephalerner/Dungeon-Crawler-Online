@@ -5,17 +5,26 @@
   <script language="javascript" type="text/javascript" src="phaser2.js"></script>
   <script language="javascript" type="text/javascript" src="game.js"></script>
   <script language="javascript" type="text/javascript" src="playerData.js"></script>
-  <script language="javascript" type="text/javascript" src="playerController.js"></script>  
+  <script language="javascript" type="text/javascript" src="playerController.js"></script>
+  <script language="javascript" type="text/javascript" src="zombieData.js"></script>
+  <script language="javascript" type="text/javascript" src="zombieController.js"></script>  
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.dev.js"></script>
 
 
 </head>
 <body id = "Body" bgcolor="#000000">
     <div class="Row" style="color: white">
-        <div class="Column"><h1 style="color: grey">Your Secret Role: <em  id="Role" style="color:crimson">SURVIVOR.</em></h1></div>
         <div class="Column"><h1 style="color: grey">Objective: <em id="Objective" style="color: crimson">DON'T DIE.</em></h1></div>
         <div class="Column"><h1 style="color: grey">Time Remaining: <em id="Timer" style="color:crimson">3:00</em></h1></div>
         <div class="Column"><h1 style="color: grey">Health Remaining: <em id="Health" style="color:crimson">2</em></h1></div>
+        <div class="Column">
+          <h3 style="color: grey">
+            Speed: <em id = "Speed" style="color:crimson">99 </em>
+            Damage: <em id = "Damage" style="color:crimson">99 </em>
+            AttackSpeed: <em id = "AttackSpeed" style="color:crimson">99 </em>
+          </h3>
+        </div>
+
     </div>
 
     <script>
