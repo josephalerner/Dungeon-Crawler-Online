@@ -23,6 +23,9 @@ var animateWeapon;
 var animateHit;
 var daggerSwish;
 var daggerHit;
+var danger;
+var levelUp;
+var zombieSlain;
 var deathScream;
 var music;
 
@@ -30,8 +33,11 @@ var dungeonScaleModifier = 1.35;
 
 function preload() {
     game.load.audio('hit', 'assets/hit.wav');
+    game.load.audio('danger', 'assets/danger.wav');
+    game.load.audio('levelUp', 'assets/levelUp.mp3');
+    game.load.audio('zombieSlain', 'assets/zombieSlain.wav');
     game.load.audio('swish', 'assets/swish.wav');
-    game.load.audio('death', 'assets/boom.wav');
+    game.load.audio('death', 'assets/fatality.mp3');
     game.load.audio('zombieDeath', 'assets/zombieDie.wav');
     game.load.audio('music', 'assets/music.wav');
     game.load.image('bolt', 'assets/bolt.png');
@@ -46,10 +52,19 @@ function preload() {
 }
 
 function create() {
+    ///this.game.resize(5*window.innerWidth, 5*window.innerHeight);
+    //game.physics.world.setBounds(0, 0, 5*window.innerWidth, 5*window.innerHeight, true, true, true, true);
+ 
+    // setting the camera bound will set where the camera can scroll to
+    // I use the 'main' camera here fro simplicity, use whichever camera you use
+        
     game.stage.backgroundColor = 0x333333;
     //TODO: loop
     daggerSwish = game.add.audio('swish');
     daggerHit = game.add.audio('hit');
+    danger = game.add.audio('danger');
+    levelUp = game.add.audio('levelUp');
+    zombieSlain = game.add.audio('zombieSlain');
     deathScream = game.add.audio('death');
     zombieScream = game.add.audio('zombieDeath');
     daggerSwish.volume = .5;
@@ -59,12 +74,12 @@ function create() {
     music.play();
     music.mute = false;
 
-    socket = io.connect('138.197.199.250:3000');
+    socket = io.connect('localhost:3000');
     // Get ready to handle the dungeon data
     socket.on('initialDataEmit', onInitialDataReceived);
 
     // Immediately create our local player
-    var newPlayerData = new PlayerData(0, 0, 0, getRandomDarkColor(), 'dagger', 5, socket.id);
+    var newPlayerData = new PlayerData(0, 0, 0, getRandomDarkColor(), 'dagger', 5, socket.id, 700);
     localPlayerController = new PlayerController(newPlayerData, true);
     allPlayerControllers.push(localPlayerController);
 
@@ -154,6 +169,7 @@ function onAttackDataReceived(data) {
         }
     }
     
+    var wasPlayerHit = false;
     // HIT PLAYER?
     if (!(data.hitId === undefined)) {
         var debugSprite = game.add.sprite(data.xDebug, data.yDebug, 'x');
@@ -173,6 +189,7 @@ function onAttackDataReceived(data) {
         daggerHit.mute = false;
         daggerHit.volume = 1;
 
+        wasPlayerHit = true;
         animateHit(hitPlayer);
         if (isLocalPlayerController(hitPlayer)) {
             localPlayerController.playerData.health -= 1;
@@ -187,7 +204,16 @@ function onAttackDataReceived(data) {
         hitZombieController = allZombieControllers.filter(zc => zc.zombieData.id == zid)[0];
         allZombieControllers = allZombieControllers.filter(zc => zc != hitZombieController);
         hitZombieController.zombieSprite.kill();
-        zombieScream.play();
+
+        if(wasPlayerHit) {
+            zombieScream.play();
+        } else {
+            zombieSlain.play();
+        }
+        
+        daggerHit.play();
+
+
     });
     
     
@@ -207,6 +233,7 @@ function onDeathDataReceived(data) {
 
     if(isLocalPlayerController(getPlayerControllerById(data.deadPlayerId))) {
         document.body.style.backgroundColor = "red";
+        deathScream.play();
         alert("You have been slain. Please do not refresh the page until the game has ended.");
     }
 }
@@ -269,7 +296,8 @@ function placeDungeon() {
             var s = game.add.sprite(i * 128 * dungeonScaleModifier, j * 128 * dungeonScaleModifier, 'chest');
             var scaleNeeded = (128* dungeonScaleModifier)/(s.width);
             scaleNeeded/=1.3;
-            s.scale.set(scaleNeeded);
+            s.scale.set(scaleNeeded * 1.3);
+            s.tint = 0xeeeeee;
             environmentGroup.add(s);
             s.anchor.x = 0.5;
             s.anchor.y = 0.5;
@@ -343,7 +371,6 @@ function updateExistingZombieDatas(zombiesFromServer) {
 
             if(zombiesFromServer[i].id == allZombieControllers[j].zombieData.id) {
                 allZombieControllers[j].zombieData = zombiesFromServer[i];
-                console.log("UPP");
                 continue;
             }
         }
@@ -358,6 +385,7 @@ function onHeartbeat(data) {
     newZombieDatas.forEach(function(zd) {
         var newZombieController = new ZombieController(zd);
         allZombieControllers.push(newZombieController);
+        danger.play();
     });
 
     updateExistingZombieDatas(zombieResponse);
@@ -377,7 +405,7 @@ function onHeartbeat(data) {
         // === vs ==
         if (pc === undefined) {
             var newPlayerData = new PlayerData(serverPlayerDatas[i].x, serverPlayerDatas[i].y, serverPlayerDatas[i].rotation, 
-                serverPlayerDatas[i].color, serverPlayerDatas[i].weapon, serverPlayerDatas[i].health, serverPlayerDatas[i].id);
+                serverPlayerDatas[i].color, serverPlayerDatas[i].weapon, serverPlayerDatas[i].health, serverPlayerDatas[i].id, serverPlayerDatas[i].attackSpeed);
             var newPlayerController = new PlayerController(newPlayerData, false);
             allPlayerControllers.push(newPlayerController);
         } else {

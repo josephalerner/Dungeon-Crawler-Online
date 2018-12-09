@@ -1,4 +1,4 @@
-function PlayerData(x, y, rotation, color, weapon, health, id) { 
+function PlayerData(x, y, rotation, color, weapon, health, id, attackSpeed) { 
     this.x = x;
     this.y = y;
     this.rotation = rotation;
@@ -6,4 +6,5 @@ function PlayerData(x, y, rotation, color, weapon, health, id) {
     this.weapon = weapon;
     this.health = health;
     this.id = id;
+    this.attackSpeed = attackSpeed;
 }

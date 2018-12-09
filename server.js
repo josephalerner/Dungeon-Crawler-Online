@@ -5,6 +5,7 @@ var express = require('express');
 
 var app = express();
 var server = app.listen(3000);
+var zombieSpeed = 4;
 
 app.use(express.static('public'));
 
@@ -20,22 +21,22 @@ function PlayerData(x, y, rotation, color, weapon, health, id) {
   this.id = id;
 }
 
-function Zombie(x, y, rotation) { 
+function Zombie(x, y, rotation, zombieSpeed) { 
   this.x = x;
   this.y = y;
   this.rotation = rotation;
-  this.speed = 3;
+  this.speed = zombieSpeed;
   this.id = nextZombieId++;
 }
 
 var nextZombieId = 0;
 
 // should be 35 but rn it's 
-var dimensions = 10; // width and height of the map
+var dimensions = 20; // width and height of the map
 var maxTunnels = 100; // max number of tunnels possible
 var maxLength = 22; // max length each tunnel can have
 var chestChancePerTile = 0.03;
-var zombieChancePerTile = .05;
+var zombieChancePerTile = .03;
 var dungeonData = createMap(dimensions, maxTunnels, maxLength);
 
 var biggerDungeonData = createArray(1, dimensions + 4)
@@ -44,7 +45,7 @@ for (let i = 2; i < dimensions; i++) {
   for (let j = 2; j < dimensions; j++) {
     biggerDungeonData[i][j] = dungeonData[i][j]
     if (biggerDungeonData[i][j] == 0 && Math.random() < chestChancePerTile) {
-      biggerDungeonData[i][j] = 1;// 2
+      biggerDungeonData[i][j] = 2;// 2
     }
   }
 }
@@ -112,7 +113,7 @@ function getOverlappingZombies(x, y, overlapRadius) {
   return overlappingZombies;
 }
 
-var zombieWaveSpawnChance = 0.008;
+var zombieWaveSpawnChance = 0.004;
 
 function heartbeat() {
   if(playerDatas.length == 0) {
@@ -130,9 +131,9 @@ function heartbeat() {
   }
   
   zombies.forEach(function(zomb) {
-    var moveDir = getPathfindingDirectionTowardsNearestPlayer(zomb.x, zomb.y);
-    var moveX = Math.cos(moveDir) * 15;
-    var moveY = Math.sin(moveDir) * 15;
+		var moveDir = getPathfindingDirectionTowardsNearestPlayer(zomb.x, zomb.y);
+    var moveX = Math.cos(moveDir) * (zomb.speed);
+    var moveY = Math.sin(moveDir) * (zomb.speed);
     zomb.x += moveX;
     zomb.y += moveY;
 		zomb.rotation = moveDir;
@@ -160,7 +161,6 @@ function heartbeat() {
 				};
 				socketServer.sockets.emit('death', deathData);
 				playerDatas = playerDatas.filter(player => player.health > 0);
-				console.log(playerDatas.length);
 
 			}
 		});
@@ -194,17 +194,14 @@ function getPathfindingDirectionTowardsNearestPlayer(x, y) {
 		}
 	}
 
-  console.log(zombieGridCoords)
   var path = findPath(dungeonData, zombieGridCoords, nearestPlayerGridCoords);
   if (path[0] === undefined) {
     console.log("Path is undefined");
   } else {
-    console.log("PATH: " + path);
   }
   if (path.length > 1) {
     var xDirection = path[1][0] - path[0][0];
     var yDirection = path[1][1] - path[0][1];
-    console.log("DIRECTION: " + Math.atan2(path[1][1] - path[0][1], path[1][0] - path[0][0]));
      var angleRadians = Math.atan2(path[1][1] - path[0][1], path[1][0] - path[0][0]);
      return angleRadians;
   } else {
@@ -257,7 +254,7 @@ function newConnection(clientSocket) {
       var attackX = playerData.x + (Math.cos(playerData.rotation + 0.3) * daggerAttackRange);
       var attackY = playerData.y + (Math.sin(playerData.rotation + 0.3) * daggerAttackRange);
 
-			var zombieRadius = playerRadius * 1.2;
+			var zombieRadius = playerRadius * 1;
       var hitPlayers = getOverlappingPlayers(attackX, attackY, playerRadius);
       var hitZombies = getOverlappingZombies(attackX, attackY, zombieRadius);
       var hitPlayerId;
@@ -368,7 +365,15 @@ function createArray(num, dimensions) {
 function SpawnZombieWave(dungeon) {
   var dimension1 = dungeon.length;
 	var dimension2 = dungeon[0].length;
-	
+
+	if(zombieWaveSpawnChance < 0.010) {
+	zombieChancePerTile += 0.001;
+	}
+
+	if(zombieSpeed < 15) {
+		zombieSpeed += 0.015;
+	}
+
   for (let i = 0; i < dimension1; i++) {
     for (let j = 0; j < dimension2; j++) {
       if (dungeon[i][j] == 0 && Math.random() < zombieChancePerTile) {
@@ -381,9 +386,10 @@ function SpawnZombieWave(dungeon) {
           continue;
         }
 
-        var zombie = new Zombie(x, y, 0);
-        if(zombies.length < 2) {
-          zombies.push(zombie);
+        var zombie = new Zombie(x, y, 0, zombieSpeed);
+        if(true) {
+					zombies.push(zombie);
+					console.log("LENGTH: " +zombies.length);
 
         }
       }

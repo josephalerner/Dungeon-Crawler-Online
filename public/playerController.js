@@ -7,15 +7,16 @@ function PlayerController(playerData, isOwnedPlayer) {
     this.playerSprite.width = 80;
     this.playerSprite.height = 80;
 
+    this.spectate = false;
     this.playerSprite.smoothed = true;
     this.playerSprite.antialiasing = true;
     this.isOwnedPlayer = isOwnedPlayer;
+    var speed = 8;
 
     // Attach weapon
     this.playerBodyGroup.add(this.playerEquipmentGroup);  
-    var weapon = this.playerEquipmentGroup.create(0, 0, this.playerData.weapon);
+    this.weapon = this.playerEquipmentGroup.create(0, 0, this.playerData.weapon);
     this.lastAttackTime = new Date().getTime();
-    this.attackSpeed = 1000 * .7; // .7 seconds
 
     // Skin player body
     this.playerSprite.tint = this.playerData.color;
@@ -23,7 +24,7 @@ function PlayerController(playerData, isOwnedPlayer) {
     document.getElementById("Health").innerHTML = this.playerData.health;
 
 
-    weapon.scale.set(.15);
+    this.weapon.scale.set(.15);
 
     /*
     var shield = this.playerEquipmentGroup.create(0, 0, 'shield');
@@ -46,7 +47,7 @@ function PlayerController(playerData, isOwnedPlayer) {
         // Update visuals: layering
         game.world.bringToTop(this.playerBodyGroup);
         game.world.bringToTop(this.playerEquipmentGroup);
-        game.world.bringToTop(weapon);
+        game.world.bringToTop(this.weapon);
 
         // Control player, if client owns it
         if (isOwnedPlayer) {
@@ -58,7 +59,6 @@ function PlayerController(playerData, isOwnedPlayer) {
             // handle movement, input, collisions really messy 
             game.physics.arcade.collide(this.playerSprite, environmentGroup, collisionHandler, null, this);
     
-            var speed = 8;
 
 
             var cursors = game.input.keyboard.createCursorKeys();
@@ -92,7 +92,7 @@ function PlayerController(playerData, isOwnedPlayer) {
                 this.playerData.y += speed;
             }
             
-            if (game.input.activePointer.leftButton.isDown && (new Date().getTime()) > this.lastAttackTime + this.attackSpeed)
+            if (game.input.activePointer.leftButton.isDown && (new Date().getTime()) > this.lastAttackTime + this.playerData.attackSpeed)
             {
                 animateWeapon(this);
                 daggerSwish.play();
@@ -129,5 +129,23 @@ function collisionHandler (obj1, obj2) {
     } else {
         canMoveRight = obj2.x- this.playerBodyGroup.x < 0;
         canMoveLeft = !canMoveRight;
+    }
+
+    if(obj2.tint == 0xeeeeee) {
+        obj2.tint = 0x333333;
+
+        levelUpAll(this);
+    }
+
+    function levelUpAll(pc) {
+        if (pc.playerData.attackSpeed > 300) {
+            pc.playerData.attackSpeed -= 70;
+            pc.playerEquipmentGroup.scale.x += .02;
+            pc.playerEquipmentGroup.scale.y += .02;
+            pc.playerBodyGroup.scale.x += .02;
+            pc.playerBodyGroup.scale.y += .02;
+            pc.speed += .3;
+            levelUp.play();
+        }
     }
 }
