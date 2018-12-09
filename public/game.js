@@ -74,7 +74,7 @@ function create() {
     music.play();
     music.mute = false;
 
-    socket = io.connect('localhost:3000');
+    socket = io.connect('http://138.197.199.250:3000');
     // Get ready to handle the dungeon data
     socket.on('initialDataEmit', onInitialDataReceived);
 
