@@ -266,7 +266,7 @@ function newConnection(clientSocket) {
       var attackX = playerData.x + (Math.cos(playerData.rotation + 0.3) * daggerAttackRange);
       var attackY = playerData.y + (Math.sin(playerData.rotation + 0.3) * daggerAttackRange);
 
-			var zombieRadius = playerRadius * 1.15;
+			var zombieRadius = playerRadius * 1.19;
       var hitPlayers = getOverlappingPlayers(attackX, attackY, playerRadius);
       var hitZombies = getOverlappingZombies(attackX, attackY, zombieRadius);
       var hitPlayerId;
@@ -382,13 +382,13 @@ function SpawnZombieWave(dungeon) {
   var dimension1 = dungeon.length;
 	var dimension2 = dungeon[0].length;
 
-	if(zombieWaveSpawnChance < 0.011) {
+	if(zombieWaveSpawnChance < 0.008) {
 	zombieChancePerTile += 0.001;
 	}
 
-	if(zombieSpeed < 12) {
+	if(zombieSpeed < 11) {
 		console.log("SPEED: " + zombieSpeed);
-		zombieSpeed += 0.5;
+		zombieSpeed += 0.4;
 	}
 
   for (let i = 0; i < dimension1; i++) {
