@@ -140,10 +140,10 @@ function collisionHandler (obj1, obj2) {
     function levelUpAll(pc) {
         if (pc.playerData.attackSpeed > 300) {
             pc.playerData.attackSpeed -= 70;
-            pc.playerEquipmentGroup.scale.x += .02;
-            pc.playerEquipmentGroup.scale.y += .02;
-            pc.playerBodyGroup.scale.x += .02;
-            pc.playerBodyGroup.scale.y += .02;
+            pc.playerEquipmentGroup.scale.x += .01;
+            pc.playerEquipmentGroup.scale.y += .01;
+            pc.playerBodyGroup.scale.x += .01;
+            pc.playerBodyGroup.scale.y += .01;
             pc.speed += .3;
             levelUp.play();
         }

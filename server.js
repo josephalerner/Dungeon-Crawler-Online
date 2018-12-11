@@ -6,12 +6,13 @@ var express = require('express');
 var app = express();
 var server = app.listen(3000);
 var zombieSpeed = 4;
+var zombieWaveSpawnChance = 0.004;
 
 app.use(express.static('public'));
 
 console.log("Ok, the server has booted.");
 
-function PlayerData(x, y, rotation, color, weapon, health, id) { 
+function PlayerData(x, y, rotation, color, weapon, health, id) {
   this.x = x;
   this.y = y;
   this.rotation = rotation;
@@ -21,7 +22,7 @@ function PlayerData(x, y, rotation, color, weapon, health, id) {
   this.id = id;
 }
 
-function Zombie(x, y, rotation, zombieSpeed) { 
+function Zombie(x, y, rotation, zombieSpeed) {
   this.x = x;
   this.y = y;
   this.rotation = rotation;
@@ -33,42 +34,45 @@ var nextZombieId = 0;
 
 // should be 35 but rn it's 
 var dimensions = 20; // width and height of the map
-var maxTunnels = 100; // max number of tunnels possible
-var maxLength = 22; // max length each tunnel can have
+var maxTunnels = 70; // max number of tunnels possible
+var maxLength = 16; // max length each tunnel can have
 var chestChancePerTile = 0.03;
 var zombieChancePerTile = .03;
 var dungeonData = createMap(dimensions, maxTunnels, maxLength);
-
-var biggerDungeonData = createArray(1, dimensions + 4)
-
-for (let i = 2; i < dimensions; i++) {
-  for (let j = 2; j < dimensions; j++) {
-    biggerDungeonData[i][j] = dungeonData[i][j]
-    if (biggerDungeonData[i][j] == 0 && Math.random() < chestChancePerTile) {
-      biggerDungeonData[i][j] = 2;// 2
-    }
-  }
-}
-
-
-
-console.log(biggerDungeonData);
-dungeonData = biggerDungeonData;
-
-//var path = findPath(dungeonData, [6, 6], [7, 7]);
-//console.log("PATTHTT:" + path);
 var socketUniversal = require('socket.io');
 var socketServer = socketUniversal(server);
-
-
-setInterval(heartbeat, 33);
-
 var playerRadius = 33;
 var zombieSpawnCheckRadius = 200;
 var dungeonScaleModifier = 1.35;
 
-SpawnZombieWave(dungeonData);
-console.log(zombies);
+FirstTimeSetup();
+StartServer();
+
+function FirstTimeSetup() {
+	setInterval(heartbeat, 33);
+	setInterval(restartServerCheck, 60000);
+}
+
+function StartServer() {
+	zombieWaveSpawnChance = 0.004;
+	zombieChancePerTile = .03;
+	playerDatas = [];
+	zombies = [];
+
+	dungeonData = createMap(dimensions, maxTunnels, maxLength);
+	var biggerDungeonData = createArray(1, dimensions + 4)
+
+	for (let i = 2; i < dimensions; i++) {
+		for (let j = 2; j < dimensions; j++) {
+			biggerDungeonData[i][j] = dungeonData[i][j]
+			if (biggerDungeonData[i][j] == 0 && Math.random() < chestChancePerTile) {
+				biggerDungeonData[i][j] = 2;// 2
+			}
+		}
+	}
+
+	dungeonData = biggerDungeonData;
+}
 
 function getNearestPlayer(x, y) {
   var nearestPlayer;
@@ -87,6 +91,7 @@ function getNearestPlayer(x, y) {
 
   return nearestPlayer;
 }
+
 function getOverlappingPlayers(x, y, overlapRadius) {
   var overlappingPlayers = [];
   for (i = 0; i < playerDatas.length; i++) {
@@ -113,7 +118,14 @@ function getOverlappingZombies(x, y, overlapRadius) {
   return overlappingZombies;
 }
 
-var zombieWaveSpawnChance = 0.004;
+
+function restartServerCheck() {
+	console.log("Check to restart server: number of players in game?: " + playerDatas);
+	if (playerDatas.length == 0) {
+		StartServer();
+		console.log("RESTARTING SERVER");
+	}
+}
 
 function heartbeat() {
   if(playerDatas.length == 0) {
@@ -138,8 +150,8 @@ function heartbeat() {
     zomb.y += moveY;
 		zomb.rotation = moveDir;
 		
-		var zombHitRadius = 10;
-		var hitPlayers = getOverlappingPlayers(zomb.x, zomb.y, zombHitRadius);
+		var zombHitPlayerRadius = 10;
+		var hitPlayers = getOverlappingPlayers(zomb.x, zomb.y, zombHitPlayerRadius);
 
 		hitPlayers.forEach(function(hitPlayer) {
 			var attackData = {
@@ -254,7 +266,7 @@ function newConnection(clientSocket) {
       var attackX = playerData.x + (Math.cos(playerData.rotation + 0.3) * daggerAttackRange);
       var attackY = playerData.y + (Math.sin(playerData.rotation + 0.3) * daggerAttackRange);
 
-			var zombieRadius = playerRadius * 1;
+			var zombieRadius = playerRadius * 1.15;
       var hitPlayers = getOverlappingPlayers(attackX, attackY, playerRadius);
       var hitZombies = getOverlappingZombies(attackX, attackY, zombieRadius);
       var hitPlayerId;
@@ -268,7 +280,7 @@ function newConnection(clientSocket) {
 
         
 
-        console.log(hitPlayer.health);
+        console.log("A player was hit: " + hitPlayer.health);
         // a little hacky, usually health is updated from client but since in testing client wont update
         // unless it is open, it's handy to do this. plus that's good in case the client quits.
         hitPlayer.health -= 1;
@@ -281,7 +293,10 @@ function newConnection(clientSocket) {
           console.log(playerDatas.length);
 
         }
-      }
+			}
+			
+			//only 1 zombie hit per attack now
+			hitZombies.length = 1;
 
       var attackData = {
         attackingId: playerData.id,
@@ -291,6 +306,7 @@ function newConnection(clientSocket) {
         yDebug: attackY
       };
 
+			// only hit 1 zombie at a time now
 			hitZombies.forEach(function(z) {
 				zombies.splice(zombies.indexOf(z), 1);
 			});
@@ -366,12 +382,13 @@ function SpawnZombieWave(dungeon) {
   var dimension1 = dungeon.length;
 	var dimension2 = dungeon[0].length;
 
-	if(zombieWaveSpawnChance < 0.010) {
+	if(zombieWaveSpawnChance < 0.011) {
 	zombieChancePerTile += 0.001;
 	}
 
-	if(zombieSpeed < 15) {
-		zombieSpeed += 0.015;
+	if(zombieSpeed < 12) {
+		console.log("SPEED: " + zombieSpeed);
+		zombieSpeed += 0.5;
 	}
 
   for (let i = 0; i < dimension1; i++) {
@@ -389,12 +406,13 @@ function SpawnZombieWave(dungeon) {
         var zombie = new Zombie(x, y, 0, zombieSpeed);
         if(true) {
 					zombies.push(zombie);
-					console.log("LENGTH: " +zombies.length);
 
         }
       }
     }
-  }
+	}
+	
+	console.log("Number of zombies after wave spawn: " + zombies.length);
 }
 
 // world is a 2d array of integers (eg world[10][15] = 0)
